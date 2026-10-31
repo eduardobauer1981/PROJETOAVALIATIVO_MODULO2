@@ -36,7 +36,7 @@ def test_modelo_e_lido_uma_unica_vez_mesmo_com_varias_requisicoes(
         assert contador_de_leituras["n"] == 1  # carregado na inicialização
 
         for _ in range(25):
-            resposta = cliente.post("/predicao/digito", json=CORPO_VALIDO)
+            resposta = cliente.post("/v1/predict", json=CORPO_VALIDO)
             assert resposta.status_code == 200
 
         assert contador_de_leituras["n"] == 1  # nenhuma leitura extra nas rotas
@@ -50,7 +50,7 @@ def test_mesmo_objeto_de_modelo_atende_todas_as_requisicoes(caminho_modelo, monk
         modelo_antes = id(service._modelo)
 
         for _ in range(5):
-            cliente.post("/predicao/digito", json=CORPO_VALIDO)
+            cliente.post("/v1/predict", json=CORPO_VALIDO)
 
         assert app.state.modelo_service is service
         assert id(service._modelo) == modelo_antes  # o mesmo objeto na RAM
@@ -70,8 +70,8 @@ def test_sem_arquivo_nao_le_disco_e_rota_responde_503(tmp_path, contador_de_leit
     monkeypatch.setattr("app.main.CAMINHO_MODELO", tmp_path / "nao_existe.joblib")
 
     with TestClient(app) as cliente:
-        assert cliente.get("/saude").json()["modelo_carregado"] is False
-        assert cliente.post("/predicao/digito", json=CORPO_VALIDO).status_code == 503
+        assert cliente.get("/health").json()["modelo_carregado"] is False
+        assert cliente.post("/v1/predict", json=CORPO_VALIDO).status_code == 503
 
     assert contador_de_leituras["n"] == 0  # a rota não tentou ler o disco por conta própria
 

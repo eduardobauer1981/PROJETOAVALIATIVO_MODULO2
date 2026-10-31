@@ -97,8 +97,13 @@ class PredicaoResponse(BaseModel):
     )
 
 
-class SaudeResponse(BaseModel):
-    """Resposta do endpoint de verificação de saúde."""
+class HealthResponse(BaseModel):
+    """Resposta do endpoint de monitoramento (GET /health)."""
 
-    status: str
-    modelo_carregado: bool
+    status: str = Field(
+        ..., description="'ok' se tudo está operacional; 'degradado' se o modelo não está na RAM."
+    )
+    servico_ativo: bool = Field(..., description="Sempre verdadeiro quando a API consegue responder.")
+    modelo_carregado: bool = Field(..., description="Verdadeiro se o modelo está carregado na memória RAM.")
+    modelo_tipo: str | None = Field(None, description="Classe do modelo em memória, ex.: MLPClassifier.")
+    mensagem: str = Field(..., description="Resumo legível do estado do serviço.")

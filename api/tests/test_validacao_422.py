@@ -1,4 +1,4 @@
-"""Provas da Fase 4: dados inválidos viram HTTP 422 ANTES de chegar ao modelo."""
+"""Provas da Fase 4: dados inválidos viram HTTP 422 (ou 400) ANTES de chegar ao modelo."""
 
 import copy
 
@@ -6,7 +6,7 @@ import pytest
 
 from app.services import ModeloService
 
-URL = "/predicao/digito"
+URL = "/v1/predict"
 VALIDO = {"pixels": [0] * 784}
 
 
@@ -65,10 +65,10 @@ def test_dado_invalido_retorna_422_e_nao_aciona_o_modelo(cliente, chamadas_ao_mo
     assert chamadas_ao_modelo["n"] == 0  # o modelo nunca foi chamado
 
 
-def test_corpo_vazio_e_json_malformado_retornam_422(cliente, chamadas_ao_modelo):
-    assert cliente.post(URL).status_code == 422
+def test_corpo_vazio_retorna_422_e_json_malformado_retorna_400(cliente, chamadas_ao_modelo):
+    assert cliente.post(URL).status_code == 422  # sem corpo: campo obrigatório ausente
     resposta = cliente.post(URL, content="{isso nao e json", headers={"Content-Type": "application/json"})
-    assert resposta.status_code == 422
+    assert resposta.status_code == 400  # erro de sintaxe: nem é um JSON
     assert chamadas_ao_modelo["n"] == 0
 
 

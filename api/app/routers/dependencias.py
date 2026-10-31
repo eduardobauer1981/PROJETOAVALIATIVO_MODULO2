@@ -11,6 +11,6 @@ def obter_modelo_service(request: Request) -> ModeloService:
     if not service.carregado:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Modelo indisponível. Verifique se models/mlp_mnist.joblib existe.",
+            detail="Modelo indisponível. Verifique o endpoint /health.",
         )
     return service

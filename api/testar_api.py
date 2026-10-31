@@ -15,7 +15,7 @@ import urllib.request
 
 from PIL import Image
 
-URL = "http://127.0.0.1:8000/predicao/digito"
+URL = "http://127.0.0.1:8000/v1/predict"
 
 
 def imagem_para_pixels(caminho: str, rotacao: int = 0) -> list[int]:

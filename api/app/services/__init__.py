@@ -1,3 +1,13 @@
-from app.services.modelo_service import ModeloNaoCarregadoError, ModeloService, ResultadoPredicao
+from app.services.modelo_service import (
+    ErroDeInferenciaError,
+    ModeloNaoCarregadoError,
+    ModeloService,
+    ResultadoPredicao,
+)
 
-__all__ = ["ModeloNaoCarregadoError", "ModeloService", "ResultadoPredicao"]
+__all__ = [
+    "ErroDeInferenciaError",
+    "ModeloNaoCarregadoError",
+    "ModeloService",
+    "ResultadoPredicao",
+]
