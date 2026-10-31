@@ -1,5 +1,0 @@
-fastapi
-uvicorn[standard]
-scikit-learn  # use a MESMA versão com que o modelo foi treinado
-joblib
-numpy
