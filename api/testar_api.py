@@ -47,7 +47,7 @@ def main():
         print("Não consegui conectar. A API está rodando? (uvicorn app.main:app --reload)")
         return
 
-    print(f"Dígito previsto: {dados['digito_previsto']}  (confiança: {dados['confianca'] * 100:.1f}%)")
+    print(f"Dígito previsto: {dados['digito_previsto']}  (confiança: {dados['confianca'] * 100:.1f}%, confiável: {'sim' if dados['confiavel'] else 'não'})")
     for digito, p in enumerate(dados["probabilidades"]):
         print(f"  {digito}: {p * 100:5.1f}%")
 

@@ -4,8 +4,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
 from app.config import CAMINHO_MODELO
+from app.erros import tratar_erro_validacao
 from app.routers import predicao, saude
 from app.services import ModeloService
 
@@ -35,6 +37,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_exception_handler(RequestValidationError, tratar_erro_validacao)
 
 app.include_router(saude.router)
 app.include_router(predicao.router)
