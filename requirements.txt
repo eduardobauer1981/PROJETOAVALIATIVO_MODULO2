@@ -1,0 +1,27 @@
+# Requisitos do projeto completo (Python 3.10 ou superior)
+# Instalação: python -m pip install -r requirements.txt
+
+# --- API (FastAPI) ---
+fastapi>=0.100
+pydantic>=2
+uvicorn[standard]
+
+# --- Modelagem (notebook) e inferência ---
+# O modelo (.joblib) foi treinado com scikit-learn 1.9.0: use a MESMA versão para carregá-lo
+scikit-learn==1.9.0
+scipy
+joblib
+numpy
+pandas
+matplotlib
+seaborn
+ipykernel
+
+# --- Interface web e scripts de teste manual ---
+streamlit>=1.30
+pillow>=9.1
+requests
+
+# --- Testes automáticos ---
+pytest
+httpx

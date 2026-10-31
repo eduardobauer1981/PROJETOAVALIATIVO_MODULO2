@@ -1,5 +1,26 @@
-fastapi
+# Requisitos do projeto completo (Python 3.10 ou superior)
+# Instalação: python -m pip install -r requirements.txt
+
+# --- API (FastAPI) ---
+fastapi>=0.100
+pydantic>=2
 uvicorn[standard]
-scikit-learn  # use a MESMA versão com que o modelo foi treinado
+
+# --- Modelagem (notebook) e inferência ---
+# Use a MESMA versão do scikit-learn com que o modelo foi treinado (pip show scikit-learn)
+scikit-learn
 joblib
 numpy
+pandas
+matplotlib
+seaborn
+ipykernel
+
+# --- Interface web e scripts de teste manual ---
+streamlit>=1.30
+pillow>=9.1
+requests
+
+# --- Testes automáticos ---
+pytest
+httpx

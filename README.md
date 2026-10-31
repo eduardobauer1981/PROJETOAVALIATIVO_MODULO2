@@ -1,11 +1,30 @@
-# Reconhecimento de Dígitos Manuscritos (MNIST) — Modelagem e API FastAPI
+# Reconhecimento de Dígitos Manuscritos (MNIST): modelagem, API FastAPI e interface web
 
-Projeto avaliativo do Módulo 2. Compara três algoritmos de machine learning na classificação de dígitos manuscritos (MNIST) e serve o modelo escolhido, uma rede neural MLP, por meio de uma API REST construída com FastAPI.
+Projeto avaliativo do Módulo 2. Compara três algoritmos de machine learning na classificação de dígitos manuscritos (MNIST), serve o modelo escolhido, uma rede neural MLP, por meio de uma API REST e oferece uma interface web para testar com imagens próprias.
 
-O projeto tem duas partes:
+## Sumário
 
-1. **Modelagem (notebook):** análise exploratória, treino, otimização, comparação de modelos e testes de generalização.
-2. **API (`app/`):** serviço em camadas, com o modelo carregado uma única vez na RAM, validação estrita de dados e tratamento padronizado de erros.
+1. [Visão geral](#visão-geral)
+2. [Resultados da modelagem](#resultados-da-modelagem)
+3. [Etapas do desenvolvimento](#etapas-do-desenvolvimento)
+4. [Arquitetura da API](#arquitetura-da-api)
+5. [Estrutura do repositório](#estrutura-do-repositório)
+6. [Instalação](#instalação)
+7. [Como executar](#como-executar)
+8. [Endpoints da API](#endpoints-da-api)
+9. [Como testar](#como-testar)
+10. [Limitações e cuidados](#limitações-e-cuidados)
+11. [Tecnologias](#tecnologias)
+
+## Visão geral
+
+O projeto tem três partes:
+
+| Parte | O que é | Onde fica |
+|---|---|---|
+| Modelagem | Análise exploratória, treino, otimização, comparação de modelos e testes de generalização | notebook `digitos_manuscritos.ipynb` |
+| API | Serviço em camadas com o modelo na RAM, validação estrita de dados e tratamento padronizado de erros | `app/` |
+| Interface web | Página para enviar uma foto de um dígito e ver o resultado | `interface/` |
 
 ## Resultados da modelagem
 
@@ -13,17 +32,36 @@ Avaliação no conjunto de teste (20% do MNIST, divisão estratificada, 14.000 i
 
 | Modelo | Acurácia | Tempo de predição (teste inteiro) |
 |---|---|---|
-| Random Forest (otimizado com `RandomizedSearchCV`) | 96,86% | 0,641 s |
-| KNN (otimizado com `GridSearchCV`) | 97,08% | 11,496 s |
-| **MLP (rede neural), modelo selecionado** | **97,94%** | **0,036 s** |
+| Random Forest (otimizado com `RandomizedSearchCV`) | 96,86% | 0,708 s |
+| KNN (otimizado com `GridSearchCV`) | 97,08% | 13,814 s |
+| **MLP (rede neural), modelo selecionado** | **97,94%** | **0,039 s** |
 
-Os modelos sem otimização ficaram em 96,72% (Random Forest) e 96,96% (KNN). O MLP teve a melhor acurácia e o menor tempo de predição, por isso foi o escolhido para a API.
+Os modelos sem otimização ficaram em 96,72% (Random Forest) e 96,96% (KNN). O MLP teve a melhor acurácia e o menor tempo de predição, por isso foi o escolhido para a API. Os tempos variam conforme a máquina. As diferenças de acurácia entre Random Forest, KNN e as versões sem otimização (cerca de 0,1 ponto percentual, ou 15 a 20 imagens de 14.000) são pequenas demais para afirmar que uma é melhor que a outra; a vantagem do MLP (cerca de 0,9 ponto percentual) é mais clara.
 
 ### Principais achados dos desafios
 
 - **Classes ocultas no treino (dígitos 8 e 9):** nenhum modelo consegue dizer "não conheço". Os três redirecionaram o 8 principalmente para o 3 (40% a 58% dos casos) e o 9 para o 4 (55% a 85%). A causa é a semelhança visual entre os dígitos, e não um viés de algoritmo.
 - **Ruído aleatório (OOD):** o MLP classificou 100% do ruído como "5" com **99,89% de confiança**. O Random Forest também colapsou numa classe, mas com 27% de confiança, e o KNN espalhou as previsões. Acurácia alta não garante segurança diante de dados desconhecidos.
 - **Manuscritos próprios:** o pré-processamento da foto (inversão de cores, centralização, espessura do traço e rotação) pesa tanto quanto o modelo.
+
+## Etapas do desenvolvimento
+
+### Modelagem (notebook)
+
+1. **Análise exploratória:** carregamento do MNIST com `fetch_openml` (70.000 imagens, 784 features), conferência da dimensionalidade e do balanceamento das classes, e grade 2x5 com amostras.
+2. **Pré-processamento:** divisão estratificada 80/20 e normalização dos pixels de 0-255 para 0-1.
+3. **Três modelos:** Random Forest, KNN e MLP, com busca de hiperparâmetros. A otimização não garante grande melhora: o ganho no Random Forest foi de 0,14 ponto percentual.
+4. **Avaliação comparativa:** matrizes de confusão e tabela com acurácia e precisão, revocação e F1 ponderados.
+5. **Desafios:** treino com classes ocultas, inferência com ruído aleatório (OOD) e teste com manuscritos próprios.
+
+### API (fases 2 a 5)
+
+| Fase | O que foi feito | Ponto principal |
+|---|---|---|
+| 2. Estrutura | `schemas/`, `services/`, `routers/` e `main.py` | Cada camada só conhece a de baixo. O service não sabe que existe HTTP. |
+| 3. Lifespan | Modelo carregado na RAM uma única vez, na inicialização | Nenhuma rota lê o disco. O carregamento é idempotente e faz uma predição de aquecimento. |
+| 4. Pydantic | Contratos com `Field` (`ge`, `le`, `gt`, tamanhos, descrições), `strict=True` e `extra="forbid"` | Dados inválidos viram 422 antes de chegar ao modelo, e o texto `"128"` não vira número. |
+| 5. Endpoints e erros | `GET /health`, `POST /v1/predict` e tratadores centralizados | Todo erro vira JSON padronizado e a API não cai. |
 
 ## Arquitetura da API
 
@@ -43,12 +81,10 @@ Requisição HTTP
   models/mlp_mnist.joblib
 ```
 
-Cada camada só conhece a de baixo. O service não sabe que existe HTTP, e o router não sabe como a rede neural funciona.
-
 ### Decisões técnicas
 
-- **Carregamento único (lifespan):** o modelo é lido do disco uma vez, na inicialização, com `@asynccontextmanager`. Nenhuma rota lê o `.joblib`. O carregamento é idempotente e faz uma predição de aquecimento.
-- **Validação estrita (Pydantic):** `Field` com `ge`, `le`, `gt`, limites de tamanho e descrições; `strict=True` (o texto `"128"` não vira número) e `extra="forbid"`. Dados inválidos são barrados antes de chegar ao modelo.
+- **Carregamento único (lifespan):** o modelo é lido do disco uma vez, na inicialização, com `@asynccontextmanager`. Nenhuma rota lê o `.joblib`.
+- **Validação estrita:** dados fora do contrato são barrados pelo Pydantic antes de chegar ao modelo.
 - **Tratamento centralizado de erros:** todo erro vira JSON padronizado. Detalhes internos ficam só no log, e o usuário recebe um `id_erro` para consulta.
 - **API resiliente:** se o modelo estiver ausente, corrompido ou incompatível, a API sobe em modo `degradado` em vez de cair.
 - **`limiar_confianca`:** regra de negócio ligada ao achado do teste OOD. A resposta traz `confiavel: false` quando a confiança fica abaixo do limiar.
@@ -71,43 +107,134 @@ Cada camada só conhece a de baixo. O service não sabe que existe HTTP, e o rou
 │   │   └── erros.py               # contratos de erro (400, 422, 500...)
 │   └── services/
 │       └── modelo_service.py      # carregamento e inferência
+├── interface/                     # interface web (Streamlit)
+│   ├── app_streamlit.py           # página: envio de imagem/câmera e resultado
+│   ├── preprocessamento.py        # foto/desenho -> formato MNIST (28x28)
+│   └── cliente_api.py             # chamadas HTTP à API
 ├── models/
 │   └── mlp_mnist.joblib           # modelo treinado (gerado pelo notebook)
-├── tests/                         # suíte pytest (46 testes)
-├── testar_api.py                  # envia uma imagem sua para a API
-├── requirements.txt
-├── requirements-dev.txt
+├── reports/
+│   └── metricas_mlp.json          # métricas do MLP (gerado pelo notebook)
+├── tests/                         # suíte pytest (71 testes)
+│   └── fixtures/                  # fotos reais de dígitos usadas nos testes
+├── docs/
+│   └── roteiro_apresentacao.md    # roteiro do vídeo de 8 minutos
+├── apresentar_metricas_mlp.py     # mostra as métricas do MLP no terminal
+├── testar_api.py                  # envia uma imagem sua para a API (linha de comando)
+├── gerar_json.py                  # gera o JSON de uma imagem para colar no /docs
+├── requirements.txt               # dependências de todo o projeto
 └── pytest.ini
 ```
 
-## Como executar
+Se no seu repositório a API estiver dentro de uma subpasta, rode os comandos de dentro dela.
 
-**Requisitos:** Python 3.10 ou superior.
+## Instalação
 
-1. **Crie e ative o ambiente virtual** (Windows PowerShell):
+**Requisitos:** Python 3.10 ou superior. O modelo foi treinado com Python 3.14 e scikit-learn 1.9.0, versão fixada no `requirements.txt`.
+
+1. **Clone o repositório e entre na pasta:**
+
+```powershell
+git clone https://github.com/eduardobauer1981/PROJETOAVALIATIVO_MODULO2
+cd PROJETOAVALIATIVO_MODULO2
+```
+
+2. **Crie e ative o ambiente virtual** (Windows PowerShell):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-2. **Instale as dependências:**
+Se o PowerShell bloquear a ativação, rode uma vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+3. **Instale todas as dependências** (API, notebook, interface e testes):
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-3. **Coloque o modelo em `models/mlp_mnist.joblib`.** Salve-o no notebook com `joblib.dump(modelo_mlp, ...)`. Instale a **mesma versão do scikit-learn** usada no treino (veja com `pip show scikit-learn` no ambiente do notebook), senão o arquivo pode falhar ao carregar.
+4. **Coloque o modelo em `models/mlp_mnist.joblib`.** Gere-o no notebook, depois de treinar o MLP:
 
-4. **Suba a API** (na pasta que contém `app/`):
+```python
+import joblib
+from pathlib import Path
+
+Path("models").mkdir(exist_ok=True)
+joblib.dump(modelo_mlp, "models/mlp_mnist.joblib")
+```
+
+O `requirements.txt` já fixa a **mesma versão do scikit-learn** usada no treino (1.9.0). Com outra versão, o arquivo pode falhar ao carregar ou gerar avisos.
+
+No VS Code, para rodar o notebook, selecione o kernel do `.venv` (Ctrl+Shift+P, depois *Python: Select Interpreter*).
+
+## Como executar
+
+### API
+
+Na pasta que contém `app/`:
 
 ```powershell
 python -m uvicorn app.main:app --reload
 ```
 
-A documentação interativa fica em `http://127.0.0.1:8000/docs`.
+A documentação interativa fica em `http://127.0.0.1:8000/docs`, onde dá para testar os endpoints direto no navegador. Para encerrar, use Ctrl+C no terminal.
 
-## Endpoints
+### Interface web
+
+Com a API rodando, abra **outro terminal**, ative o `.venv` e rode:
+
+```powershell
+python -m streamlit run interface/app_streamlit.py
+```
+
+A página abre em `http://localhost:8501`. Ela:
+
+- **Aceita arquivo ou câmera:** envie um png/jpg ou tire uma foto.
+- **Prepara a imagem automaticamente:** corrige a orientação de fotos de celular, detecta sozinha qual é o fundo, mede a tinta comparando cada ponto com o papel ao redor (sombras e a mesa aparecendo na foto não viram traço), isola o dígito, engrossa canetas finas até a espessura do MNIST, ajusta a uma caixa de 20x20 e centraliza pelo centro de massa. A imagem 28x28 que o modelo recebe aparece na tela.
+- **Tem controles na barra lateral:** limiar de confiança, quantidade de previsões, inversão de cores, traço extra mais grosso e rotação.
+- **Avisa os erros:** API fora do ar, modelo não carregado e dados recusados.
+
+O endereço da API pode ser trocado na barra lateral ou pela variável de ambiente `API_URL`.
+
+### Scripts de linha de comando
+
+```powershell
+# Enviar uma foto sua para a API (use --rotacao 90 se a foto sair deitada)
+python testar_api.py "C:\caminho\imagem.jpg"
+
+# Gerar o JSON de uma imagem para colar em http://127.0.0.1:8000/docs
+python gerar_json.py "C:\caminho\imagem.jpg" | clip
+
+# Mostrar as métricas do MLP (veja a seção abaixo para gerar o JSON)
+python apresentar_metricas_mlp.py
+```
+
+Para o `apresentar_metricas_mlp.py` funcionar, rode **uma vez** esta célula no final do notebook. Ela só reaproveita variáveis que já existem (`rel_mlp` e `tempo_pred_mlp`) e salva as métricas em `reports/metricas_mlp.json`:
+
+```python
+import json
+from pathlib import Path
+
+pasta = Path.cwd() / "reports"
+pasta.mkdir(exist_ok=True)
+
+metricas = {
+    "modelo": "MLPClassifier",
+    "acuracia": rel_mlp["accuracy"],
+    "precisao_ponderada": rel_mlp["weighted avg"]["precision"],
+    "recall_ponderado": rel_mlp["weighted avg"]["recall"],
+    "f1_ponderado": rel_mlp["weighted avg"]["f1-score"],
+    "tempo_predicao_s": tempo_pred_mlp,
+    "por_classe": {str(i): rel_mlp[str(i)] for i in range(10)},
+}
+
+(pasta / "metricas_mlp.json").write_text(
+    json.dumps(metricas, indent=2, ensure_ascii=False, default=float), encoding="utf-8"
+)
+```
+
+## Endpoints da API
 
 ### `GET /health`
 
@@ -136,7 +263,7 @@ Recebe uma imagem 28x28 achatada em 784 pixels (0 a 255, fundo preto e traço br
 | `limiar_confianca` | número | opcional, maior que 0 e até 1 (padrão 0,5) |
 | `top_k` | inteiro | opcional, de 1 a 10 (padrão 3) |
 
-Resposta (200):
+Resposta (200). Os valores abaixo são ilustrativos:
 
 ```json
 {
@@ -153,8 +280,6 @@ Resposta (200):
 }
 ```
 
-Os valores acima são ilustrativos.
-
 ### Status codes
 
 | Status | Quando acontece |
@@ -166,44 +291,47 @@ Os valores acima são ilustrativos.
 | 503 | Modelo indisponível (não está na RAM) |
 | 500 | Falha inesperada (resposta com `id_erro`, sem detalhes internos) |
 
-## Testando
+## Como testar
 
-### Testes automáticos (46 testes)
+### Testes automáticos (71 testes)
 
 ```powershell
-python -m pip install -r requirements-dev.txt
 python -m pytest -v
 ```
 
-Os testes treinam um MLP minúsculo na hora, então não dependem do `.joblib` real.
+Os testes treinam um MLP minúsculo na hora, então não dependem do `.joblib` real. Para rodar só um arquivo, use `python -m pytest tests/test_endpoints.py -v`. Para filtrar por nome, use `-k health`.
 
 | Arquivo | O que prova |
 |---|---|
 | `test_ciclo_vida.py` | O modelo é lido do disco uma única vez, mesmo após várias requisições. Nenhuma rota importa `joblib` ou `pickle`. |
 | `test_validacao_422.py` | Dados inválidos retornam 422 (ou 400) e o modelo é chamado 0 vezes. Os limites exatos são aceitos. |
 | `test_endpoints.py` | `/health`, `/v1/predict` e os códigos 400, 404, 405, 500 e 503. Depois de um erro 500, a API continua respondendo. |
+| `test_preprocessamento.py` | O preparo de imagens da interface gera 784 pixels válidos, detecta o fundo, centraliza o dígito, ignora sombra e mesa escura, ajusta a espessura do traço e avisa quando não há traço. Inclui 4 fotos reais de dígitos. |
 
 ### Teste manual
 
+1. Suba a API (`python -m uvicorn app.main:app --reload`).
+2. Verifique o `/health`. O esperado é `modelo_carregado: true`:
+
 ```powershell
-# Integridade (modelo_carregado deve ser true)
 Invoke-RestMethod http://127.0.0.1:8000/health
+```
 
-# Enviar uma foto de um dígito escrito por você
-python testar_api.py "C:\caminho\imagem.jpg"
-# se a foto sair deitada: python testar_api.py "C:\caminho\imagem.jpg" --rotacao 90
+3. Envie uma foto pela interface web ou pelo `testar_api.py`.
+4. Veja um erro 422 de verdade:
 
-# Ver um erro 422
+```powershell
 $ruim = @{ pixels = @(0, 1, 2); top_k = 11 } | ConvertTo-Json -Compress
 Invoke-RestMethod -Uri http://127.0.0.1:8000/v1/predict -Method Post -ContentType "application/json" -Body $ruim
 ```
 
 ## Limitações e cuidados
 
-- O modelo foi treinado com imagens do MNIST (dígitos centralizados, fundo preto). Fotos reais exigem pré-processamento cuidadoso, e o `testar_api.py` aplica o mesmo usado no notebook.
+- O modelo foi treinado com imagens do MNIST (dígitos centralizados, fundo preto). Fotos reais exigem pré-processamento cuidadoso. A interface aplica um preparo no estilo MNIST, validado com testes e com fotos reais, mas ele não garante acerto: escreva um único dígito grande, em papel claro e com boa iluminação, e confira na tela a imagem 28x28 que o modelo recebe.
 - Classificadores fechados sempre devolvem uma classe, mesmo para entradas que não são dígitos. Use o campo `confiavel` com cautela: o MLP pode ter confiança altíssima em dados desconhecidos.
 - Com `uvicorn --workers N`, cada processo carrega a sua própria cópia do modelo na RAM.
+- Os testes automáticos usam um modelo fictício. Eles garantem que o preparo da imagem funciona, mas a precisão do MLP real com fotos só aparece nos testes manuais.
 
 ## Tecnologias
 
-Python, scikit-learn, NumPy, pandas, matplotlib, seaborn, joblib, FastAPI, Uvicorn, Pydantic e pytest.
+Python, scikit-learn, NumPy, pandas, matplotlib, seaborn, joblib, FastAPI, Uvicorn, Pydantic, Streamlit, Pillow, requests e pytest.
